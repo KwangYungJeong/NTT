@@ -63,6 +63,9 @@ def mrc_crt(m, a):
         x_prev = x_curr
 
         inv = mod_inverse(Mi, m[i])
+        # delta is the difference between the new target remainder a_{i+1}
+        # and the current partial solution x_i; we correct x_i by adding
+        # v_{i+1} * Mi so that the new congruence is satisfied.
         delta = a[i] - x_prev
         v[i] = (delta * inv) % m[i]
         x_curr = x_prev + v[i] * Mi
@@ -75,7 +78,7 @@ def mrc_crt(m, a):
             f"\tCalculating inv = M{i}^(-1) mod m{i+1} = {Mi}^(-1) mod {m[i]} = {inv}, "
             f"because ({Mi} * {inv}) % {m[i]} = 1"
         )
-        print(f"\tDelta = a{i+1} - x{i} = {a[i]} - {x_prev} = {delta}")
+        print(f"\tDelta = a{i+1} - x{i} = {a[i]} - {x_prev} = {delta}  (how far current x is from the new remainder)")
         print(f"\t==> v{i+1} = Delta * inv (mod m{i+1}) = {delta} * {inv} (mod {m[i]}) = {v[i]}")
         print(f"\tUpdate partial x{i+1} = x{i} + v{i+1}*M{i} = {x_prev} + {v[i]}*{Mi} = {x_curr}")
 
