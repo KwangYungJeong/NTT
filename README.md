@@ -71,7 +71,12 @@ This script demonstrates the core NTT algorithm ($O(N \log N)$) to multiply two 
 ### Run
 
 ```bash
+# Run with default prime (469762049)
 python3 src/NTT.py
+
+# Run with a custom prime (e.g., 17)
+# Primitive root (g) will be calculated automatically
+python3 src/NTT.py --prime 17
 ```
 
 ### Default Parameters

@@ -6,22 +6,38 @@
 # Optimized with pre-computation and class-based configuration.
 # ==========================================
 
+import sys
+import argparse
+
+try:
+    from sympy import isprime
+    from sympy.ntheory import primitive_root
+except ImportError:
+    print("Error: 'sympy' library is not installed.")
+    print("Please install it using: pip install sympy")
+    sys.exit(1)
+
 class NTTContext:
     """
     A context for NTT operations with a specific prime and primitive root.
     Provides optimized transforms by pre-computing twiddle factors and bit-reversal maps.
     """
     
-    def __init__(self, mod=469762049, g=3):
+    def __init__(self, mod=469762049, g=None):
         """
         Initializes the NTT context.
         
         Args:
             mod (int): The prime modulus (p = c * 2^k + 1).
-            g (int): A primitive root modulo p.
+            g (int, optional): A primitive root modulo p. If None, it will be calculated.
         """
+        if not isprime(mod):
+            raise ValueError(f"Modulus {mod} must be a prime number.")
+        
         self.mod = mod
-        self.g = g
+        self.g = g if g is not None else int(primitive_root(mod))
+        
+        # Pre-computations cache
         # Pre-computations cache
         self.rev = {}          # size N -> bit-reversal list
         self.roots = {}        # size N -> twiddle factors list
@@ -136,63 +152,61 @@ def multiply_polynomials(a, b):
     return _default_ctx.multiply(a, b)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Enhanced NTT Polynomial Multiplication Demo")
+    parser.add_argument("--prime", type=int, default=469762049, help="Prime modulus to use (default: 469762049)")
+    parser.add_argument("--g", type=int, default=None, help="Primitive root (optional, will be calculated if not provided)")
+    args = parser.parse_args()
+
+    try:
+        ctx = NTTContext(args.prime, args.g)
+    except Exception as e:
+        print(f"Error initializing NTT: {e}")
+        sys.exit(1)
+
     print("-" * 50)
-    print("Enhanced NTT (Level 1) - Step-by-Step Demo")
-    print(f"Modulus: {_default_ctx.mod}, Root: {_default_ctx.g}")
+    print("Enhanced NTT (Level 1) - Dynamic Configuration")
+    print(f"Modulus: {ctx.mod}, Calculated Root: {ctx.g}")
     print("-" * 50)
 
-    # Goal: (1 + 2x + 3x^2) * (4 + 5x)
-    # Result: 4 + (5+8)x + (10+12)x^2 + 15x^3 = 4 + 13x + 22x^2 + 15x^3
     p1 = [1, 2, 3]
     p2 = [4, 5]
     
     print(f"Goal: Multiply A(x) and B(x)")
     print(f"  A(x) = {p1}")
     print(f"  B(x) = {p2}")
-    print("-" * 50)
-
-    # --- Step 1: Determine the size of the operation (N) ---
-    # The degree of product P(x) = A(x) * B(x) is deg(A) + deg(B).
-    # Therefore, the number of coefficients in the result is (len(A) + len(B) - 1).
-    target_len = len(p1) + len(p2) - 1
     
-    # NTT (like FFT) requires the buffer size 'N' to be:
-    # 1. A power of 2 (for the recursive divide-and-conquer butterfly structure).
-    # 2. Greater than or equal to 'target_len' (to avoid "cyclic convolution" or aliasing).
-    #    If N < target_len, the higher-degree terms will 'wrap around' and corrupt 
-    #    lower-degree terms (e.g., x^N would wrap back to x^0).
+    target_len = len(p1) + len(p2) - 1
     n = 1 << (target_len - 1).bit_length()
     
-    print(f"[Step 1] Determine N (Transform Size)")
-    print(f"  - Target result length: {target_len} Method 1: (Sum of degrees + 1)")
-    print(f"  - Target result length: {target_len} Method 2: len(A) + len(B) - 1")
-    print(f"  - Calculated N: {n} (Smallest power of 2 >= {target_len})")
+    # Verify if the prime is suitable for this N
+    p_minus_1 = ctx.mod - 1
+    k = 0
+    while p_minus_1 % 2 == 0:
+        p_minus_1 //= 2
+        k += 1
     
+    if n > (1 << k):
+        print(f"⚠️  Warning: Modulus {ctx.mod} only supports N up to 2^{k}={1<<k}.")
+        print(f"   Target N={n} exceeds the 2-adic valuation of this prime.")
+        sys.exit(1)
+
     fa = p1 + [0] * (n - len(p1))
     fb = p2 + [0] * (n - len(p2))
-    print(f"  - Padded A to size {n}: {fa}")
-    print(f"  - Padded B to size {n}: {fb}")
-
-    print(f"\n[Step 2] Forward NTT: Moving to Frequency Domain...")
-    ntt(fa, False)
-    ntt(fb, False)
-    # Now fa and fb are "Point-Value" representations
-    print(f"  A in freq domain: {fa[:4]}...") 
-
-    print(f"\n[Step 3] Point-wise Multiply: Multiplication in Freq Domain is O(N)")
+    
+    ctx.transform(fa, False)
+    ctx.transform(fb, False)
+    
     for i in range(n):
-        fa[i] = (fa[i] * fb[i]) % _default_ctx.mod
+        fa[i] = (fa[i] * fb[i]) % ctx.mod
     
-    print(f"\n[Step 4] Inverse NTT: Returning to Coefficient Domain...")
-    ntt(fa, True)
+    ctx.transform(fa, True)
     
-    print(f"\n[Step 5] Trimming: Result valid up to target length {target_len}")
     result = fa[:target_len]
-    print(f"  Final Coefficients: {result}")
+    print(f"\nFinal Coefficients: {result}")
     
     expected = [4, 13, 22, 15]
     if result == expected:
-        print("\nVerification SUCCESS! ✅ (Product: 4 + 13x + 22x^2 + 15x^3)")
+        print("\nVerification SUCCESS! ✅")
     else:
         print(f"\nVerification FAILED! ❌ Expected: {expected}")
     print("-" * 50)
