@@ -117,7 +117,26 @@ python3 src/CRT.py
 
 ---
 
+---
+
 ## References
+
+### NTT & Polynomials
 - [Number-theoretic transform (Wiki)](https://en.wikipedia.org/wiki/Number-theoretic_transform)
 - [CP-Algorithms: NTT](https://cp-algorithms.com/algebra/fft.html)
 - [Project Nayuki: Integer DFT](https://www.nayuki.io/page/number-theoretic-transform-integer-dft)
+- [Choosing NTT Primes (Hatsya)](https://hatsya.com/blog/an-efficient-prime-for-number-theoretic-transforms)
+
+### CRT (Chinese Remainder Theorem)
+- [CRT Overview (Wiki)](https://en.wikipedia.org/wiki/Chinese_remainder_theorem)
+- [Constructive CRT (Gauss-style)](https://en.wikipedia.org/wiki/Chinese_remainder_theorem#Existence_(constructive_proof))
+- [Garner’s Algorithm (Mixed Radix)](https://en.wikipedia.org/wiki/Chinese_remainder_theorem#Garner's_algorithm)
+- [CP-Algorithms: CRT](https://cp-algorithms.com/algebra/chinese-remainder-theorem.html)
+
+### Mathematical Background
+- [Proth Prime (NTT-friendly)](https://en.wikipedia.org/wiki/Proth_prime)
+- [Solinas Prime (Goldilocks-type)](https://en.wikipedia.org/wiki/Solinas_prime)
+- [2-adic Valuation](https://en.wikipedia.org/wiki/P-adic_order)
+- [Primitive Root Modulo n](https://en.wikipedia.org/wiki/Primitive_root_modulo_n)
+- [Extended Euclidean Algorithm](https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm)
+- [Hamming Weight (Efficiency)](https://en.wikipedia.org/wiki/Hamming_weight)
