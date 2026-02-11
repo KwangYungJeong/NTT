@@ -44,11 +44,19 @@ NTT enables fast multiplication by switching between the **Coefficient Domain** 
 5.  **Trimming**: Remove trailing zeros to get the final result.
 
 ### Worked Example ($N=8, p=17$)
-| Stage | Process | Data State (Bit-reversed) |
+
+This example demonstrates the full cycle of multiplying $A(x)=1+2x+3x^2$ and $B(x)=4+5x$ using $p=17$ and $N=8$.
+
+| Step | Operation | Result / State |
 | :--- | :--- | :--- |
-| **Initial** | Input coefficients | `[1, 2, 3, 4, 0, 0, 0, 0]` |
-| **Bit-Reversal** | Reorder indices | `[1, 0, 3, 0, 2, 0, 4, 0]` |
-| **F-NTT** | Butterfly with $w=9$ | **`[10, 16, 6, 11, 15, 13, 7, 15]`** |
+| **1. Padding** | Pad to $N=8$ | $A: [1, 2, 3, 0, 0, 0, 0, 0]$, $B: [4, 5, 0, 0, 0, 0, 0, 0]$ |
+| **2. F-NTT** | Transform $A, B$ ($w=9$) | $A_{freq}: [6, 12, 12, 8, 2, 7, 7, 5]$, $B_{freq}: [9, 14, 4, 1, 16, 7, 13, 11]$ |
+| **3. Multiply** | Point-wise ($A \cdot B$) | $C_{freq}: [3, 15, 14, 8, 15, 15, 6, 4] \pmod{17}$ |
+| **4. I-NTT** | Inverse ($w^{-1}=2$) | $C_{coeff}: [4, 13, 5, 15, 0, 0, 0, 0]$ (Note: $22 \equiv 5 \pmod{17}$) |
+| **5. Trimming** | Final Result | **$4 + 13x + 5x^2 + 15x^3$** |
+
+> [!IMPORTANT]
+> **Numerical Aliasing**: Notice the $x^2$ coefficient is **5**, not 22. This is because $22 \pmod{17} = 5$. For larger results, use a larger prime or **Multi-Modulus NTT**.
 
 ---
 
