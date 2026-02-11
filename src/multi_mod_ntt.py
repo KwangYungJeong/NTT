@@ -16,13 +16,13 @@ class MultiModNTT:
     and reconstructs the results using the Chinese Remainder Theorem.
     """
     
-    def __init__(self, moduli_configs):
+    def __init__(self, primes):
         """
         Args:
-            moduli_configs (list): List of (prime, root) tuples.
+            primes (list): List of prime moduli.
         """
-        self.contexts = [NTTContext(m, g) for m, g in moduli_configs]
-        self.moduli = [m for m, g in moduli_configs]
+        self.contexts = [NTTContext(m) for m in primes]
+        self.moduli = primes
 
     def multiply(self, a, b):
         """
@@ -54,13 +54,14 @@ class MultiModNTT:
 
 if __name__ == "__main__":
     # Selected 3 Primes from prime_search.py
-    configs = [
-        (2013265921, 31),
-        (469762049, 3),
-        (1811939329, 13)
+    # Roots (g) are now calculated dynamically within NTTContext
+    primes = [
+        2013265921,
+        469762049,
+        1811939329
     ]
     
-    mm_ntt = MultiModNTT(configs)
+    mm_ntt = MultiModNTT(primes)
     
     print("-" * 60)
     print("Multi-Modulus NTT Demo (Handling Large Coefficients)")
@@ -78,7 +79,7 @@ if __name__ == "__main__":
     print(f"Polynomial B: {p2}")
     
     # 1. Single Modulus NTT (Should fail due to overflow/wrap-around)
-    single_ctx = NTTContext(469762049, 3) # Rank 2 prime
+    single_ctx = NTTContext(469762049) # Rank 2 prime
     single_res = single_ctx.multiply(p1, p2)
     print(f"\n[Single Modulus res (MOD=469762049)]")
     print(f"  Result: {single_res}")

@@ -11,6 +11,30 @@ except ImportError:
     print("Please install it using: pip install sympy")
     sys.exit(1)
 
+def get_primitive_root(p):
+    """Returns a primitive root modulo p."""
+    return int(primitive_root(p))
+
+def get_2_adic_valuation(p):
+    """Returns the maximum power of 2 that divides p-1."""
+    p_minus_1 = p - 1
+    k = 0
+    while p_minus_1 % 2 == 0:
+        p_minus_1 //= 2
+        k += 1
+    return k
+
+def is_ntt_friendly(p, n):
+    """Checks if prime p supports NTT size n (n must be power of 2)."""
+    return (p - 1) % n == 0
+
+def get_root_of_unity(p, n):
+    """Returns the n-th primitive root of unity modulo p."""
+    if not is_ntt_friendly(p, n):
+        raise ValueError(f"Prime {p} does not support NTT size {n}")
+    g = get_primitive_root(p)
+    return pow(g, (p - 1) // n, p)
+
 def search_ntt_prime(n_power=20, count=5, lower_g=False):
     """
     Finds primes suitable for Number Theoretic Transform (NTT).

@@ -74,17 +74,17 @@ This script demonstrates the core NTT algorithm ($O(N \log N)$) to multiply two 
 # Run with default prime (469762049)
 python3 src/NTT.py
 
-# Run with a custom prime (e.g., 17)
-# Primitive root (g) will be calculated automatically
-python3 src/NTT.py --prime 17
+# Run with a custom prime (e.g., 2013265921)
+# The primitive root (g) is calculated in real-time using sympy.
+python3 src/NTT.py --prime 2013265921
 ```
 
-### Default Parameters
-By default, the script uses a production-grade **NTT-friendly prime**:
+### Dynamic Configuration
+By default, the script and the `NTTContext` class **automatically discover** the primitive root $g$. This ensures mathematical correctness for any provided prime without manual configuration.
 
-- **Modulus ($p$)**: `469762049` ($7 \cdot 2^{26} + 1$)
-- **Primitive Root ($g$)**: `3`
-- **Capacity ($N$)**: Up to $2^{26}$ (~67 million coefficients).
+- **Modulus ($p$)**: User-defined or default (`469762049`).
+- **Primitive Root ($g$)**: Calculated in real-time via `sympy.ntheory.primitive_root`.
+- **Safety Check**: The system automatically verifies the **2-adic valuation** to ensure the prime supports the required transform size $N$.
 
 ---
 

@@ -10,12 +10,15 @@ import sys
 import argparse
 
 try:
-    from sympy import isprime
-    from sympy.ntheory import primitive_root
+    from prime_search import get_primitive_root, get_2_adic_valuation, get_root_of_unity
 except ImportError:
-    print("Error: 'sympy' library is not installed.")
-    print("Please install it using: pip install sympy")
-    sys.exit(1)
+    # Fallback if prime_search is not in path or has issues
+    from sympy.ntheory import primitive_root
+    def get_primitive_root(p): return int(primitive_root(p))
+    def get_2_adic_valuation(p):
+        v, p1 = 0, p-1
+        while p1 % 2 == 0: v, p1 = v + 1, p1 // 2
+        return v
 
 class NTTContext:
     """
@@ -23,19 +26,19 @@ class NTTContext:
     Provides optimized transforms by pre-computing twiddle factors and bit-reversal maps.
     """
     
-    def __init__(self, mod=469762049, g=None):
+    def __init__(self, mod=469762049):
         """
         Initializes the NTT context.
         
         Args:
             mod (int): The prime modulus (p = c * 2^k + 1).
-            g (int, optional): A primitive root modulo p. If None, it will be calculated.
         """
-        if not isprime(mod):
-            raise ValueError(f"Modulus {mod} must be a prime number.")
-        
+        # Note: mod check is still done here or via get_primitive_root
         self.mod = mod
-        self.g = g if g is not None else int(primitive_root(mod))
+        self.g = get_primitive_root(mod)
+        
+        # 2-adic valuation for safety check
+        self.max_k = get_2_adic_valuation(mod)
         
         # Pre-computations cache
         # Pre-computations cache
@@ -154,11 +157,10 @@ def multiply_polynomials(a, b):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Enhanced NTT Polynomial Multiplication Demo")
     parser.add_argument("--prime", type=int, default=469762049, help="Prime modulus to use (default: 469762049)")
-    parser.add_argument("--g", type=int, default=None, help="Primitive root (optional, will be calculated if not provided)")
     args = parser.parse_args()
 
     try:
-        ctx = NTTContext(args.prime, args.g)
+        ctx = NTTContext(args.prime)
     except Exception as e:
         print(f"Error initializing NTT: {e}")
         sys.exit(1)
@@ -178,15 +180,9 @@ if __name__ == "__main__":
     target_len = len(p1) + len(p2) - 1
     n = 1 << (target_len - 1).bit_length()
     
-    # Verify if the prime is suitable for this N
-    p_minus_1 = ctx.mod - 1
-    k = 0
-    while p_minus_1 % 2 == 0:
-        p_minus_1 //= 2
-        k += 1
-    
-    if n > (1 << k):
-        print(f"⚠️  Warning: Modulus {ctx.mod} only supports N up to 2^{k}={1<<k}.")
+    # Verify if the prime is suitable for this N using helper
+    if n > (1 << ctx.max_k):
+        print(f"⚠️  Warning: Modulus {ctx.mod} only supports N up to 2^{ctx.max_k}={1 << ctx.max_k}.")
         print(f"   Target N={n} exceeds the 2-adic valuation of this prime.")
         sys.exit(1)
 
