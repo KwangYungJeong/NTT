@@ -64,6 +64,25 @@ Final aggregation for each method:
 
 
 
+## NTT (Number Theoretic Transform) Demo
+
+This script demonstrates the core NTT algorithm ($O(N \log N)$) to multiply two polynomials. It includes detailed console output for each step of the calculation.
+
+### Run
+
+```bash
+python3 src/NTT.py
+```
+
+### Default Parameters
+By default, the script uses a production-grade **NTT-friendly prime**:
+
+- **Modulus ($p$)**: `469762049` ($7 \cdot 2^{26} + 1$)
+- **Primitive Root ($g$)**: `3`
+- **Capacity ($N$)**: Up to $2^{26}$ (~67 million coefficients).
+
+---
+
 ## Prime Search Tools
 
 This project includes a Python script `prime_search.py` to find suitable primes for NTT and other modular arithmetic applications.
@@ -169,11 +188,28 @@ When designing an NTT-based system, you must consider two primary mathematical c
 
 ---
 
-### References (Prime & NTT)
+---
+
+## Choosing a Good NTT Prime
+
+A "good" prime for NTT must satisfy specific mathematical and computational criteria:
+
+1.  **Form: $p = k \cdot N + 1$**: This guarantees the existence of an $N$-th primitive root of unity. For FFT-like efficiency, $N$ should be a power of 2 ($2^n$).
+2.  **Magnitude**: $p$ must be larger than the maximum possible coefficient in the result polynomial to avoid aliasing.
+3.  **Efficiency**: Primes like **Proth primes** or **Fermat numbers** ($2^k + 1$) often allow for faster modular reduction.
+
+### Key References (Deep Dive)
+- **Project Nayuki**: [Number-theoretic transform (integer DFT)](https://www.nayuki.io/page/number-theoretic-transform-integer-dft) - A great overview of selection criteria.
+- **Kyber/Dilithium NTT**: Primes like `12289` (BLISS) and `3329` (Kyber) are standards in PQC.
+- **Choosing NTT Primes**: [How to find good primes](https://hatsya.com/blog/an-efficient-prime-for-number-theoretic-transforms) - Technical blog on large NTT primes.
+- **Arithmetic in Finite Fields**: Standard textbooks (e.g., *Menezes et al.*) cover primitive roots and modular arithmetic.
+
+---
+
+### References (Prime & NTT Basics)
 
 - **Number Theoretic Transform (NTT)**: `https://en.wikipedia.org/wiki/Number-theoretic_transform`
-- **Proth Prime** (NTT-friendly primes of form $k \cdot 2^n + 1$): `https://en.wikipedia.org/wiki/Proth_prime`
-- **Solinas Prime** (Goldilocks-type primes for fast reduction): `https://en.wikipedia.org/wiki/Solinas_prime`
-- **2-adic valuation** (Divisibility by powers of 2): `https://en.wikipedia.org/wiki/P-adic_order`
-- **Primitive Root** (Basis for finding roots of unity): `https://en.wikipedia.org/wiki/Primitive_root_modulo_n`
-- **Hamming Weight** (Efficiency in modular reduction): `https://en.wikipedia.org/wiki/Hamming_weight`
+- **Proth Prime** (NTT-friendly): `https://en.wikipedia.org/wiki/Proth_prime`
+- **Solinas Prime** (Goldilocks-type): `https://en.wikipedia.org/wiki/Solinas_prime`
+- **2-adic valuation**: `https://en.wikipedia.org/wiki/P-adic_order`
+- **Primitive Root**: `https://en.wikipedia.org/wiki/Primitive_root_modulo_n`
