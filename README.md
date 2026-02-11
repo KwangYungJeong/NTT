@@ -96,40 +96,75 @@ python3 src/prime_search.py search_goldilock_prime --n_start 20 --n_end 31
 
 ## NTT Step-by-Step Breakdown
 
-The Number Theoretic Transform (Forward NTT) moves a polynomial from the **Coefficient Domain** to the **Frequency (Point-Value) Domain**.
+The Number Theoretic Transform (NTT) enables fast polynomial multiplication by switching between the **Coefficient Domain** and the **Frequency (Point-Value) Domain**.
 
-### Step 2: Forward NTT Core
-1.  **Bit-Reversal Permutation**: Reorders the input array so that butterfly operations can be performed iteratively (bottom-up).
-    -   Example: Index `1 (01₂)` is swapped with `2 (10₂)` for $N=4$.
-2.  **Butterfly Operations (Iterative)**: Combines pairs of values using powers of the root of unity ($w$).
-    -   $u = a[i+j]$
-    -   $v = a[i+j+half] \cdot w^k \pmod p$
-    -   `New a[i+j] = u + v`
-    -   `New a[i+j+half] = u - v`
+### Step 1: Size Determination & Padding
+1.  Calculate target length: $L = len(A) + len(B) - 1$.
+2.  Find $N$ as the smallest power of 2 such that $N \ge L$.
+3.  Pad both polynomials with zeros up to length $N$.
+    -   This prevents **Cyclic Convolution (Aliasing)**.
+
+### Step 2: Forward NTT (Transform)
+Moves polynomials to the Frequency Domain.
+1.  **Bit-Reversal Permutation**: Reorders indices for iterative processing.
+2.  **Butterfly Operations**: Combines values using $w^k \pmod p$ to evaluate the polynomial at $N$ points.
+
+### Step 3: Point-wise Multiplication
+In the Frequency Domain, multiplication of two polynomials is simply the element-by-element product of their evaluations:
+-   $C_{freq}[i] = (A_{freq}[i] \cdot B_{freq}[i]) \pmod p$
+-   Complexity: **$O(N)$** (Much faster than $O(N^2)$ convolution!)
+
+### Step 4: Inverse NTT (Reverse Transform)
+Moves the product back to the Coefficient Domain.
+1.  Uses the same butterfly structure but with the **inverse root of unity** $w^{-1}$.
+2.  Requires a final **Scaling**: multiply all elements by $N^{-1} \pmod p$.
+
+### Step 5: Trimming
+Remove the trailing zeros beyond the target length $L$ to get the final coefficients.
+
+---
 
 ### Worked Example: $N=8, p=17$
-- **Input Polynomial**: $A(x) = 1 + 2x + 3x^2 + 4x^3$  $\rightarrow$ `[1, 2, 3, 4, 0, 0, 0, 0]`
-- **Parameters**: Modulo $p=17$, 8th root of unity $w=9$ (since $9^8 \equiv 1 \pmod{17}$)
+- **Input**: $A(x) = 1 + 2x + 3x^2 + 4x^3$
+- **Parameters**: Modulo $p=17$, 8th root of unity $w=9$, $w^{-1}=2$.
 
-| Stage | Process | Data State (Indices are bit-reversed) |
+| Stage | Process | Data State (Indices bit-reversed) |
 | :--- | :--- | :--- |
 | **Initial** | Input coefficients | `[1, 2, 3, 4, 0, 0, 0, 0]` |
-| **Bit-Reversal** | Reorder indices `[0,4,2,6,1,5,3,7]` | `[1, 0, 3, 0, 2, 0, 4, 0]` |
-| **Butterfly (Len 2)** | $(u \pm v) \pmod{17}$ | `[1, 1, 3, 3, 2, 2, 4, 4]` |
-| **Butterfly (Len 4)** | $w_{len}=w^2=13$ | `[4, 6, 15, 13, 6, 3, 15, 1]` |
-| **Butterfly (Len 8)** | $w_{len}=w^1=9$ | **`[10, 16, 6, 11, 15, 13, 7, 15]`** |
+| **Bit-Reversal** | Reorder indices | `[1, 0, 3, 0, 2, 0, 4, 0]` |
+| **F-NTT (Len 8)** | Butterfly with $w=9$ | **`[10, 16, 6, 11, 15, 13, 7, 15]`** |
 
-**Verification**: 
-The NTT result $X_k$ corresponds to the polynomial evaluation $A(w^k) = \sum_{j=0}^{N-1} a_j \cdot w^{kj} \pmod p$.
+**Verification (Frequency Domain)**: 
+The NTT result $X_k$ corresponds to the evaluation $A(w^k) \pmod p$.
+- $A(1) = 1+2+3+4 = \mathbf{10}$
+- $A(9) = 1(9)^0 + 2(9)^1 + 3(9)^2 + 4(9)^3 \equiv \mathbf{16}$
+- $A(13) = 1(13)^0 + 2(13)^1 + 3(13)^2 + 4(13)^3 \equiv \mathbf{6}$
 
-- **For $k=0$ ($w^0=1$):**
-  $A(1) = 1(1)^0 + 2(1)^1 + 3(1)^2 + 4(1)^3 + 0 + \dots = 1 + 2 + 3 + 4 = \mathbf{10} \pmod{17}$
-- **For $k=1$ ($w^1=9$):**
-  $A(9) = 1(9)^0 + 2(9)^1 + 3(9)^2 + 4(9)^3 \equiv 1 + 18 + 243 + 2916 \equiv 1 + 1 + 5 + 9 = \mathbf{16} \pmod{17}$
-- **For $k=2$ ($w^2=13$):**
-  $A(13) = 1(13)^0 + 2(13)^1 + 3(13)^2 + 4(13)^3 \equiv 1 + 26 + 507 + 8788 \equiv 1 + 9 + 14 + 16 = \mathbf{6} \pmod{17}$
+---
 
-The resulting vector **`[10, 16, 6, 11, 15, 13, 7, 15]`** perfectly matches these evaluations!
+## NTT Constraints & Limits
+
+When designing an NTT-based system, you must consider two primary mathematical constraints determined by your choice of modulus $m$.
+
+### 1. Horizontal Limit: Number of Coefficients ($N$)
+- **Constraint**: The maximum transform size $N$ is limited by the **2-adic valuation** of $m-1$.
+- **Formula**: if $m-1 = k \cdot 2^n$, then $N_{max} = 2^n$.
+- **In this Repo**: $m = 469762049 = 7 \cdot 2^{26} + 1$, so $N \le 2^{26}$ (~67 million).
+- **Consequence**: Attempting a transform larger than this will fail as the required $N$-th roots of unity do not exist.
+
+### 2. Vertical Limit: Magnitude of Coefficients ($C_i$)
+- **Constraint**: Each resulting coefficient $C_i$ must be smaller than the modulus $m$ to avoid **modular wrap-around (aliasing)**.
+- **Formula**: $\max(C_i) < m$. 
+- **In this Repo**: Results $> 469,762,049$ will be "cut" by the modulo (e.g., $5 \cdot 10^8 \pmod m = 30,237,951$).
+- **Solution**: If your expected coefficients are larger than $m$, you must use **Multi-Modulus NTT** (combine results from $m_1, m_2, \dots$ via CRT).
+
+| Constraint | Decided By | Default Limit | If Exceeded? |
+| :--- | :--- | :--- | :--- |
+| **Data Size (N)** | $m-1$ structure | $2^{26}$ elements | Calculation Error |
+| **Value ($C_i$)** | $|m|$ magnitude | $469,762,049$ | Numerical Aliasing |
+
+---
+
 ### References (Prime & NTT)
 
 - **Number Theoretic Transform (NTT)**: `https://en.wikipedia.org/wiki/Number-theoretic_transform`
