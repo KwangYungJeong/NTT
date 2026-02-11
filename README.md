@@ -3,7 +3,7 @@
 ## Requirements
 
 - Python 3.x (no third-party dependencies)
-
+- `sympy` (for primality testing and modular inverse)
 
 
 ## CRT (Chinese Remainder Theorem) Demo
@@ -91,6 +91,45 @@ python3 src/prime_search.py search_goldilock_prime --n_start 20 --n_end 31
 **Key Output:**
 - **Golden! (phi)**: Indicates $2m \approx n$, allowing for Karatsuba-like optimization.
 - **Word 32-bit**: Indicates $n$ is a multiple of 32, suitable for word-aligned implementation.
+
+---
+
+## NTT Step-by-Step Breakdown
+
+The Number Theoretic Transform (Forward NTT) moves a polynomial from the **Coefficient Domain** to the **Frequency (Point-Value) Domain**.
+
+### Step 2: Forward NTT Core
+1.  **Bit-Reversal Permutation**: Reorders the input array so that butterfly operations can be performed iteratively (bottom-up).
+    -   Example: Index `1 (01₂)` is swapped with `2 (10₂)` for $N=4$.
+2.  **Butterfly Operations (Iterative)**: Combines pairs of values using powers of the root of unity ($w$).
+    -   $u = a[i+j]$
+    -   $v = a[i+j+half] \cdot w^k \pmod p$
+    -   `New a[i+j] = u + v`
+    -   `New a[i+j+half] = u - v`
+
+### Worked Example: $N=8, p=17$
+- **Input Polynomial**: $A(x) = 1 + 2x + 3x^2 + 4x^3$  $\rightarrow$ `[1, 2, 3, 4, 0, 0, 0, 0]`
+- **Parameters**: Modulo $p=17$, 8th root of unity $w=9$ (since $9^8 \equiv 1 \pmod{17}$)
+
+| Stage | Process | Data State (Indices are bit-reversed) |
+| :--- | :--- | :--- |
+| **Initial** | Input coefficients | `[1, 2, 3, 4, 0, 0, 0, 0]` |
+| **Bit-Reversal** | Reorder indices `[0,4,2,6,1,5,3,7]` | `[1, 0, 3, 0, 2, 0, 4, 0]` |
+| **Butterfly (Len 2)** | $(u \pm v) \pmod{17}$ | `[1, 1, 3, 3, 2, 2, 4, 4]` |
+| **Butterfly (Len 4)** | $w_{len}=w^2=13$ | `[4, 6, 15, 13, 6, 3, 15, 1]` |
+| **Butterfly (Len 8)** | $w_{len}=w^1=9$ | **`[10, 16, 6, 11, 15, 13, 7, 15]`** |
+
+**Verification**: 
+The NTT result $X_k$ corresponds to the polynomial evaluation $A(w^k) = \sum_{j=0}^{N-1} a_j \cdot w^{kj} \pmod p$.
+
+- **For $k=0$ ($w^0=1$):**
+  $A(1) = 1(1)^0 + 2(1)^1 + 3(1)^2 + 4(1)^3 + 0 + \dots = 1 + 2 + 3 + 4 = \mathbf{10} \pmod{17}$
+- **For $k=1$ ($w^1=9$):**
+  $A(9) = 1(9)^0 + 2(9)^1 + 3(9)^2 + 4(9)^3 \equiv 1 + 18 + 243 + 2916 \equiv 1 + 1 + 5 + 9 = \mathbf{16} \pmod{17}$
+- **For $k=2$ ($w^2=13$):**
+  $A(13) = 1(13)^0 + 2(13)^1 + 3(13)^2 + 4(13)^3 \equiv 1 + 26 + 507 + 8788 \equiv 1 + 9 + 14 + 16 = \mathbf{6} \pmod{17}$
+
+The resulting vector **`[10, 16, 6, 11, 15, 13, 7, 15]`** perfectly matches these evaluations!
 ### References (Prime & NTT)
 
 - **Number Theoretic Transform (NTT)**: `https://en.wikipedia.org/wiki/Number-theoretic_transform`

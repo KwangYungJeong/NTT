@@ -2,170 +2,197 @@
 # ==========================================
 # Number Theoretic Transform (NTT) Implementation
 # ==========================================
-# Prime: p = 469762049 (7 * 2^26 + 1)
-# Primitive Root: g = 3
-# Max N: 2^26 (approx 67 million)
+# Level 1: Core Algorithm
+# Optimized with pre-computation and class-based configuration.
 # ==========================================
 
-MOD = 469762049
-G = 3
-
-def power(a, b, m):
-    """Computes (a^b) % m using modular exponentiation."""
-    res = 1
-    a %= m
-    while b > 0:
-        if b % 2 == 1:
-            res = (res * a) % m
-        a = (a * a) % m
-        b //= 2
-    return res
-
-def mod_inverse(n, m):
-    """Computes modular multiplicative inverse of n modulo m."""
-    return power(n, m - 2, m)
-
-def ntt(a, invert):
+class NTTContext:
     """
-    Performs NTT (Number Theoretic Transform) or Inverse NTT.
-    
-    Args:
-        a (list): Input polynomial coefficients. Length must be a power of 2.
-        invert (bool): If True, performs Inverse NTT.
-    
-    Returns:
-        list: Transformed coefficients (in-place modification).
+    A context for NTT operations with a specific prime and primitive root.
+    Provides optimized transforms by pre-computing twiddle factors and bit-reversal maps.
     """
-    n = len(a)
     
-    # 1. Bit-reversal permutation (Iterative ordering)
-    # Reorders the array so that butterfly operations can be done iteratively.
-    j = 0
-    for i in range(1, n):
-        bit = n >> 1
-        while j & bit:
-            j ^= bit
-            bit >>= 1
-        j ^= bit
-        if i < j:
-            a[i], a[j] = a[j], a[i]
-
-    # 2. Butterfly Operations (Cooley-Tukey)
-    length = 2
-    while length <= n:
-        # Calculate root of unity for this level (w_len)
-        # w_len = g^((MOD-1)/length) % MOD
-        # Note: (MOD-1) // length is the rotation step size in the exponent.
+    def __init__(self, mod=469762049, g=3):
+        """
+        Initializes the NTT context.
         
-        step = (MOD - 1) // length
-        if invert:
-            # For Inverse NTT, we use g^(-step) which is mod_inverse(g^step)
-            # Or simply g^(MOD-1 - step) because g^(MOD-1) = 1.
-            # But calculating inverse of w_len is safer/standard.
-            w_len = power(G, step, MOD)
-            w_len = mod_inverse(w_len, MOD)
-        else:
-            w_len = power(G, step, MOD)
-            
-        for i in range(0, n, length):
-            w = 1
-            for j in range(length // 2):
-                # Butterfly:
-                # u = a[i+j]
-                # v = a[i+j+len/2] * w
-                # a[i+j] = u + v
-                # a[i+j+len/2] = u - v
-                
-                u = a[i + j]
-                v = (a[i + j + length // 2] * w) % MOD
-                
-                a[i + j] = (u + v) % MOD
-                a[i + j + length // 2] = (u - v + MOD) % MOD
-                
-                w = (w * w_len) % MOD
-        length <<= 1
+        Args:
+            mod (int): The prime modulus (p = c * 2^k + 1).
+            g (int): A primitive root modulo p.
+        """
+        self.mod = mod
+        self.g = g
+        # Pre-computations cache
+        self.rev = {}          # size N -> bit-reversal list
+        self.roots = {}        # size N -> twiddle factors list
+        self.inv_roots = {}    # size N -> inverse twiddle factors list
 
-    # 3. For Inverse NTT, scale by n^(-1)
-    if invert:
-        n_inv = mod_inverse(n, MOD)
+    def _prepare(self, n):
+        """
+        Pre-computes bit-reversal mapping and twiddle factors for size n.
+        
+        Args:
+            n (int): The size of the transform (must be a power of 2).
+        """
+        if n in self.rev:
+            return
+
+        # 1. Pre-compute Bit-reversal indices
+        rev = [0] * n
+        h = n.bit_length() - 1
         for i in range(n):
-            a[i] = (a[i] * n_inv) % MOD
+            rev[i] = (rev[i >> 1] >> 1) | ((i & 1) << (h - 1))
+        self.rev[n] = rev
+
+        # 2. Pre-compute Twiddle factors (roots of unity)
+        # Instead of calculating power(G, step, MOD) every time, 
+        # we pre-calculate w^i for each level.
+        roots = [1] * n
+        inv_roots = [1] * n
+        
+        # Primitive n-th root of unity w = g^((mod-1)/n) % mod
+        w_n = pow(self.g, (self.mod - 1) // n, self.mod)
+        w_inv = pow(w_n, self.mod - 2, self.mod)
+        
+        curr_w = 1
+        curr_inv = 1
+        for i in range(n):
+            roots[i] = curr_w
+            inv_roots[i] = curr_inv
+            curr_w = (curr_w * w_n) % self.mod
+            curr_inv = (curr_inv * w_inv) % self.mod
             
-    return a
+        self.roots[n] = roots
+        self.inv_roots[n] = inv_roots
+
+    def transform(self, a, invert=False):
+        """
+        Performs Forward or Inverse NTT in-place.
+        
+        Mathematical Background:
+        NTT maps coefficients {a_i} to point-values {A_j} where 
+        A_j = sum_{i=0}^{n-1} a_i * (w^j)^i (mod p).
+        This is exactly like DFT but replaces e^(2πi/n) with w.
+        """
+        n = len(a)
+        self._prepare(n)
+        
+        rev = self.rev[n]
+        for i in range(n):
+            if i < rev[i]:
+                a[i], a[rev[i]] = a[rev[i]], a[i]
+        
+        length = 2
+        while length <= n:
+            half = length // 2
+            # Select relevant roots of unity for this length
+            # If full n-th root is w, then length-th root is w^(n/length)
+            step = n // length
+            target_roots = self.inv_roots[n] if invert else self.roots[n]
+            
+            for i in range(0, n, length):
+                for j in range(half):
+                    u = a[i + j]
+                    v = (a[i + j + half] * target_roots[j * step]) % self.mod
+                    
+                    a[i + j] = (u + v) % self.mod
+                    a[i + j + half] = (u - v + self.mod) % self.mod
+            length <<= 1
+            
+        if invert:
+            n_inv = pow(n, self.mod - 2, self.mod)
+            for i in range(n):
+                a[i] = (a[i] * n_inv) % self.mod
+        
+        return a
+
+    def multiply(self, a, b):
+        """
+        Fast polynomial multiplication using NTT.
+        Complexity: O(N log N)
+        """
+        target_len = len(a) + len(b) - 1
+        n = 1 << (target_len - 1).bit_length()
+        
+        fa = a + [0] * (n - len(a))
+        fb = b + [0] * (n - len(b))
+        
+        self.transform(fa, False)
+        self.transform(fb, False)
+        
+        for i in range(n):
+            fa[i] = (fa[i] * fb[i]) % self.mod
+            
+        self.transform(fa, True)
+        return fa[:target_len]
+
+# Global instance for ease of use
+_default_ctx = NTTContext()
+
+def ntt(a, invert=False):
+    return _default_ctx.transform(a, invert)
 
 def multiply_polynomials(a, b):
-    """
-    Multiplies two polynomials a(x) and b(x) using NTT.
-    
-    Args:
-        a (list): Coefficients of polynomial A (low degree first).
-        b (list): Coefficients of polynomial B (low degree first).
-        
-    Returns:
-        list: Coefficients of product polynomial C = A * B.
-    """
-    # 1. Determine size N (power of 2) >= len(a) + len(b) - 1
-    # Example: deg(A)=1 (len 2), deg(B)=1 (len 2) -> deg(A*B)=2 (len 3) -> N=4
-    n = 1
-    while n < len(a) + len(b) - 1:
-        n <<= 1
-        
-    # 2. Pad vectors with zeros to size N
-    # Make copies to avoid modifying original lists
-    fa = a[:] + [0] * (n - len(a))
-    fb = b[:] + [0] * (n - len(b))
-    
-    # 3. Applying NTT (Forward Transform)
-    # fa and fb are now in Frequency Domain (Point-value representation)
-    ntt(fa, False)
-    ntt(fb, False)
-    
-    # 4. Point-wise multiplication
-    # C(x_i) = A(x_i) * B(x_i)
-    for i in range(n):
-        fa[i] = (fa[i] * fb[i]) % MOD
-        
-    # 5. Inverse NTT
-    # Transform back to Coefficient Domain
-    ntt(fa, True)
-    
-    # The result 'fa' now contains coefficients of A*B.
-    # The degree is len(a) + len(b) - 2, so relevant length is len(a) + len(b) - 1.
-    return fa
+    return _default_ctx.multiply(a, b)
 
 if __name__ == "__main__":
     print("-" * 50)
-    print(f"NTT Polynomial Multiplication")
-    print(f"Prime: {MOD}, Root: {G}")
+    print("Enhanced NTT (Level 1) - Step-by-Step Demo")
+    print(f"Modulus: {_default_ctx.mod}, Root: {_default_ctx.g}")
     print("-" * 50)
 
-    # Example 1: (x + 1)(x + 2) = x^2 + 3x + 2
-    # Coefficients: [1, 1] * [2, 1] -> [2, 3, 1]
-    poly_a = [1, 1]
-    poly_b = [2, 1]
+    # Goal: (1 + 2x + 3x^2) * (4 + 5x)
+    # Result: 4 + (5+8)x + (10+12)x^2 + 15x^3 = 4 + 13x + 22x^2 + 15x^3
+    p1 = [1, 2, 3]
+    p2 = [4, 5]
     
-    print(f"\nTest 1: (1 + x) * (2 + x)")
-    print(f"  Poly A: {poly_a}")
-    print(f"  Poly B: {poly_b}")
+    print(f"Goal: Multiply A(x) and B(x)")
+    print(f"  A(x) = {p1}")
+    print(f"  B(x) = {p2}")
+    print("-" * 50)
+
+    # --- Step 1: Determine the size of the operation (N) ---
+    # The degree of product P(x) = A(x) * B(x) is deg(A) + deg(B).
+    # Therefore, the number of coefficients in the result is (len(A) + len(B) - 1).
+    target_len = len(p1) + len(p2) - 1
     
-    result = multiply_polynomials(poly_a, poly_b)
-    # Expected length: 2 + 2 - 1 = 3
-    valid_len = len(poly_a) + len(poly_b) - 1
-    print(f"  Result (Full N): {result}")
-    print(f"  Result (Trimmed): {result[:valid_len]}")
+    # NTT (like FFT) requires the buffer size 'N' to be:
+    # 1. A power of 2 (for the recursive divide-and-conquer butterfly structure).
+    # 2. Greater than or equal to 'target_len' (to avoid "cyclic convolution" or aliasing).
+    #    If N < target_len, the higher-degree terms will 'wrap around' and corrupt 
+    #    lower-degree terms (e.g., x^N would wrap back to x^0).
+    n = 1 << (target_len - 1).bit_length()
     
-    # Example 2: Larger polynomial
-    # (1 + 2x + 3x^2) * (4 + 5x)
-    # = 4 + 5x + 8x + 10x^2 + 12x^2 + 15x^3
-    # = 4 + 13x + 22x^2 + 15x^3
-    print(f"\nTest 2: (1 + 2x + 3x^2) * (4 + 5x)")
-    poly_c = [1, 2, 3]
-    poly_d = [4, 5]
-    print(f"  Poly C: {poly_c}")
-    print(f"  Poly D: {poly_d}")
+    print(f"[Step 1] Determine N (Transform Size)")
+    print(f"  - Target result length: {target_len} Method 1: (Sum of degrees + 1)")
+    print(f"  - Target result length: {target_len} Method 2: len(A) + len(B) - 1")
+    print(f"  - Calculated N: {n} (Smallest power of 2 >= {target_len})")
     
-    res2 = multiply_polynomials(poly_c, poly_d)
-    valid_len2 = len(poly_c) + len(poly_d) - 1
-    print(f"  Result (Trimmed): {res2[:valid_len2]}")
+    fa = p1 + [0] * (n - len(p1))
+    fb = p2 + [0] * (n - len(p2))
+    print(f"  - Padded A to size {n}: {fa}")
+    print(f"  - Padded B to size {n}: {fb}")
+
+    print(f"\n[Step 2] Forward NTT: Moving to Frequency Domain...")
+    ntt(fa, False)
+    ntt(fb, False)
+    # Now fa and fb are "Point-Value" representations
+    print(f"  A in freq domain: {fa[:4]}...") 
+
+    print(f"\n[Step 3] Point-wise Multiply: Multiplication in Freq Domain is O(N)")
+    for i in range(n):
+        fa[i] = (fa[i] * fb[i]) % _default_ctx.mod
     
+    print(f"\n[Step 4] Inverse NTT: Returning to Coefficient Domain...")
+    ntt(fa, True)
+    
+    print(f"\n[Step 5] Trimming: Result valid up to target length {target_len}")
+    result = fa[:target_len]
+    print(f"  Final Coefficients: {result}")
+    
+    expected = [4, 13, 22, 15]
+    if result == expected:
+        print("\nVerification SUCCESS! ✅ (Product: 4 + 13x + 22x^2 + 15x^3)")
+    else:
+        print(f"\nVerification FAILED! ❌ Expected: {expected}")
     print("-" * 50)
