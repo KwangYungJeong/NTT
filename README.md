@@ -1,4 +1,12 @@
-# CRT (Chinese Remainder Theorem) Demo
+# NTT & Foundation Tools
+
+## Requirements
+
+- Python 3.x (no third-party dependencies)
+
+
+
+## CRT (Chinese Remainder Theorem) Demo
 
 This repo contains a single Python script, `CRT.py`, that demonstrates solving a system of congruences using:
 
@@ -7,14 +15,10 @@ This repo contains a single Python script, `CRT.py`, that demonstrates solving a
 
 The script prints intermediate steps so you can follow the arithmetic.
 
-## Requirements
-
-- Python 3.x (no third-party dependencies)
-
-## Run
+### Run
 
 ```bash
-python3 CRT.py
+python3 src/CRT.py
 ```
 
 By default, the script uses:
@@ -24,12 +28,12 @@ By default, the script uses:
 
 and prints the final solution $x$ (mod $M$) computed by both methods.
 
-## Notes
+### Notes
 
 - CRT requires the moduli to be **pairwise coprime** for a unique solution modulo $M = \prod m_i$.
 - The MRC section maintains a running partial solution `x_curr` and updates it at each step; this makes the final “reconstruction” step unnecessary.
 
-## Worked example (side‑by‑side)
+### Worked example (side‑by‑side)
 
 For the default system
 
@@ -50,7 +54,7 @@ Final aggregation for each method:
 - Gauss: $x = (770 + 693 + 990 + 840) \pmod{1155} = 3293 \pmod{1155} = \mathbf{653}$
 - MRC: $x = 2 + 6 + 15 + 630 = \mathbf{653}$
 
-## References (good starting points)
+### References (good starting points)
 
 - Chinese Remainder Theorem (overview): `https://en.wikipedia.org/wiki/Chinese_remainder_theorem`
 - Constructive CRT (Gauss-style reconstruction formula): `https://en.wikipedia.org/wiki/Chinese_remainder_theorem#Existence_(constructive_proof)`
@@ -59,3 +63,39 @@ Final aggregation for each method:
 - Modular inverse / Extended Euclidean algorithm: `https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm`
 
 
+
+## Prime Search Tools
+
+This project includes a Python script `prime_search.py` to find suitable primes for NTT and other modular arithmetic applications.
+
+### 1. Search for NTT Primes
+Finds primes of the form $p = c \cdot 2^k + 1$ that support large NTT sizes.
+
+```bash
+# Find 5 primes with at least 2^20 capacity
+python3 src/prime_search.py search_ntt_prime --n_power 20 --count 5
+```
+
+**Key Output:**
+- **2-adic valuation**: Max power of 2 that divides $p-1$. Determines max FFT size.
+- **Max Root of Unity ($w$)**: Primitive root of unity for the max FFT size.
+
+### 2. Search for Goldilocks/Solinas Primes
+Finds primes of the form $2^n - c$ or $2^n - 2^m \pm 1$ optimized for fast modular reduction (but usually bad for NTT).
+
+```bash
+# Search for Solinas primes near 2^20 to 2^31
+python3 src/prime_search.py search_goldilock_prime --n_start 20 --n_end 31
+```
+
+**Key Output:**
+- **Golden! (phi)**: Indicates $2m \approx n$, allowing for Karatsuba-like optimization.
+- **Word 32-bit**: Indicates $n$ is a multiple of 32, suitable for word-aligned implementation.
+### References (Prime & NTT)
+
+- **Number Theoretic Transform (NTT)**: `https://en.wikipedia.org/wiki/Number-theoretic_transform`
+- **Proth Prime** (NTT-friendly primes of form $k \cdot 2^n + 1$): `https://en.wikipedia.org/wiki/Proth_prime`
+- **Solinas Prime** (Goldilocks-type primes for fast reduction): `https://en.wikipedia.org/wiki/Solinas_prime`
+- **2-adic valuation** (Divisibility by powers of 2): `https://en.wikipedia.org/wiki/P-adic_order`
+- **Primitive Root** (Basis for finding roots of unity): `https://en.wikipedia.org/wiki/Primitive_root_modulo_n`
+- **Hamming Weight** (Efficiency in modular reduction): `https://en.wikipedia.org/wiki/Hamming_weight`
