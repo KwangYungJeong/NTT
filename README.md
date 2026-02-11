@@ -92,13 +92,28 @@ python3 src/prime_search.py search_goldilock_prime --n_start 20 --n_end 31
 
 ## 5. CRT (Chinese Remainder Theorem) Demo
 
-Independent utility to solve systems of congruences.
+Solve a system of congruences $x \equiv a_i \pmod{m_i}$ where the moduli are pairwise coprime.
 
 ### Run
 ```bash
 python3 src/CRT.py
 ```
--   **Methods**: Includes both **Gauss construction** and **Mixed Radix Conversion (MRC)**.
+
+### Methods
+-   **Gauss Construction**: Uses the formula $x = \sum a_i M_i y_i \pmod M$, where $M_i = M/m_i$ and $y_i = M_i^{-1} \pmod{m_i}$.
+-   **Mixed Radix Conversion (MRC)**: A Garner-style iterative construction $x = v_1 + v_2 m_1 + v_3 m_1 m_2 + \dots$ that is often more efficient for large numbers.
+
+### Worked Example (Side-by-Side)
+For Moduli $m = [3, 5, 7, 11]$ and Remainders $a = [2, 3, 2, 4]$:
+
+| Step | Gauss construction ($x = \sum a_i M_i y_i$) | Mixed Radix Conversion (Garner's) |
+| :--- | :--- | :--- |
+| **1** | $M_1 = 385, y_1 = 1 \Rightarrow w_1 = 2 \cdot 385 \cdot 1 = \mathbf{770}$ | $v_1 = a_1 = \mathbf{2}$ (x_curr: 2) |
+| **2** | $M_2 = 231, y_2 = 1 \Rightarrow w_2 = 3 \cdot 231 \cdot 1 = \mathbf{693}$ | $v_2 = (a_2 - x_1) \cdot M_1^{-1} \equiv \mathbf{2} \pmod 5$ (x_curr: 8) |
+| **3** | $M_3 = 165, y_3 = 3 \Rightarrow w_3 = 2 \cdot 165 \cdot 3 = \mathbf{990}$ | $v_3 = (a_3 - x_2) \cdot (M_1 m_2)^{-1} \equiv \mathbf{1} \pmod 7$ (x_curr: 23) |
+| **4** | $M_4 = 105, y_4 = 2 \Rightarrow w_4 = 4 \cdot 105 \cdot 2 = \mathbf{840}$ | $v_4 = (a_4 - x_3) \cdot (M_1 m_2 m_3)^{-1} \equiv \mathbf{6} \pmod{11}$ (x_curr: 653) |
+
+**Final Result**: Both methods yield $x = \mathbf{653} \pmod{1155}$.
 
 ---
 
