@@ -107,7 +107,9 @@ The Number Theoretic Transform (NTT) enables fast polynomial multiplication by s
 ### Step 2: Forward NTT (Transform)
 Moves polynomials to the Frequency Domain.
 1.  **Bit-Reversal Permutation**: Reorders indices for iterative processing.
-2.  **Butterfly Operations**: Combines values using $w^k \pmod p$ to evaluate the polynomial at $N$ points.
+2.  **Butterfly Operations**: Combines values using the **summation formula**:
+    $$X_k = \sum_{j=0}^{N-1} a_j \cdot \omega^{kj} \pmod p$$
+    (where $X_k$ is the evaluation at $\omega^k$)
 
 ### Step 3: Point-wise Multiplication
 In the Frequency Domain, multiplication of two polynomials is simply the element-by-element product of their evaluations:
@@ -115,8 +117,10 @@ In the Frequency Domain, multiplication of two polynomials is simply the element
 -   Complexity: **$O(N)$** (Much faster than $O(N^2)$ convolution!)
 
 ### Step 4: Inverse NTT (Reverse Transform)
-Moves the product back to the Coefficient Domain.
-1.  Uses the same butterfly structure but with the **inverse root of unity** $w^{-1}$.
+Moves the product back to the Coefficient Domain utilizing the **inverse formula**:
+$$a_j = N^{-1} \sum_{k=0}^{N-1} X_k \cdot \omega^{-kj} \pmod p$$
+
+1.  Uses the same butterfly structure but with the **inverse root of unity** $\omega^{-1}$.
 2.  Requires a final **Scaling**: multiply all elements by $N^{-1} \pmod p$.
 
 ### Step 5: Trimming
